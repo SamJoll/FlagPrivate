@@ -1,0 +1,14 @@
+main: ru.samjoll.main.FlagPrivate
+
+version: 1
+api-version: 1.16
+
+name: FlagPrivate
+description: "This plugin allows set flags that protect your territory in some cases. The plugin is owned by SamJoll. Don't use it if you don't have permission!"
+author: SamJoll
+website: https://github.com/SamJoll
+
+commands:
+  flagprivate:
+    aliases: [fp]
+    permission: flagprivate

@@ -1,0 +1,17 @@
+#Custom items
+custom-items:
+  flag-pillar:
+    material: STICK
+    name: "§aСтолб флага"
+    lore:
+      - "§7Используется в создании флага"
+  flag-cloth:
+    material: FLOWER_BANNER_PATTERN
+    name: "§aЗнамя"
+    lore:
+      - "§7Используется в создании флага"
+  flag:
+    material: END_ROD
+    name: "§9§lФлаг"
+    lore:
+      - "§7Устанавливает флаг"

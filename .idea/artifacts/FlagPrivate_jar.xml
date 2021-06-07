@@ -1,0 +1,11 @@
+<component name="ArtifactManager">
+  <artifact type="jar" build-on-make="true" name="FlagPrivate:jar">
+    <output-path>$USER_HOME$/Desktop/plugin dev/plugins</output-path>
+    <root id="archive" name="FlagPrivate.jar">
+      <element id="module-output" name="FlagPrivate" />
+      <element id="extracted-dir" path="$USER_HOME$/Downloads/spigot-1.16.5.jar" path-in-jar="/" />
+      <element id="file-copy" path="$PROJECT_DIR$/src/ru/samjoll/resources/plugin.yml" />
+      <element id="file-copy" path="$PROJECT_DIR$/src/ru/samjoll/resources/config.yml" />
+    </root>
+  </artifact>
+</component>
