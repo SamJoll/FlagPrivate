@@ -88,6 +88,7 @@ public class FlagCloth implements Listener {
 
                         e.getInventory().setResult(newFlagCloth);
                     } else {
+                        e.getView().getPlayer().sendMessage(String.valueOf(plugin.GetLangFileLine("ru", "exceptions.flag-exists")));
                         e.getInventory().setResult(null);
                     }
                     return;

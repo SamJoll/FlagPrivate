@@ -15,7 +15,7 @@ public class PlayerHandler implements Listener {
     }
 
     @EventHandler
-    void PlayerJoinEvent(PlayerJoinEvent e) {
+    void PlayerJoinEvent(PlayerJoinEvent e) throws Exception {
         final String playerName = e.getPlayer().getName();
         final String playerId = e.getPlayer().getUniqueId().toString();
         plugin.playersDB.WritePlayer(playerName, playerId);

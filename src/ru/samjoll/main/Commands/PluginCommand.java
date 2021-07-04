@@ -22,8 +22,8 @@ public class PluginCommand implements CommandExecutor, TabExecutor {
 
     @Override
     public boolean onCommand(CommandSender commandSender, Command command, String label, String[] args) {
-        if(args[0] == "reload") {
-            plugin.reloadConfig();
+        if(args[0].equals("reload")) {
+            plugin.ReloadConfig();
             return true;
         } else {
             return false;

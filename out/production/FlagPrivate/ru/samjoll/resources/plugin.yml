@@ -12,3 +12,12 @@ commands:
   flagprivate:
     aliases: [fp]
     permission: flagprivate
+  inviteflagmember:
+    aliases: [ifm]
+    permission: flagprivate.flagmembermanager
+  removeflagmember:
+    aliases: [rfm]
+    permission: flagprivate.flagmembermanager
+  confirminvitation:
+    aliases: [confirmfi]
+    permission: flagprivate.flagmembermanager

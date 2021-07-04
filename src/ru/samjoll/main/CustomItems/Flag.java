@@ -4,10 +4,19 @@ import org.bukkit.Keyed;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.craftbukkit.v1_16_R3.metadata.BlockMetadataStore;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.*;
@@ -67,6 +76,7 @@ public class Flag implements Listener {
         flagRecipe.addIngredient(Material.getMaterial(plugin.getConfig().getString("custom-items." + FlagPillar.itemId + ".material")));
     }
 
+//    Функция установки флага
     Runnable SetFlag(ItemStack flag, Location flagLoc) {
 
         final ItemMeta flagMeta = flag.getItemMeta();
@@ -90,6 +100,10 @@ public class Flag implements Listener {
                     }
                 }
 
+                flagLoc.add(0, 1, 0);
+                flagLoc.getWorld().getBlockAt(flagLoc).setType(Material.getMaterial(plugin.getConfig().getString("flag-knob-material")));
+                flagLoc.add(0, -1, 0);
+
                 for(int i = 0; i < 9; i++) {
                     flagLoc.add(1, 0, 0);
 
@@ -103,8 +117,48 @@ public class Flag implements Listener {
         };
     }
 
+//    Проверка территории на наличие флага
+    boolean isFlagZone(Location point) throws Exception {
+        for (String flagId : plugin.flagsDB.GetFlagsId()) {
+            int offset = plugin.getConfig().getInt("protection-distance");
+            Location flagLoc = plugin.flagsDB.GetFlagLoc(flagId);
+            int x = flagLoc.getBlockX() - offset;
+            int z = flagLoc.getBlockZ() - offset;
+            int dx = flagLoc.getBlockX() + offset;
+            int dz = flagLoc.getBlockZ() + offset;
+
+            if (point.getBlockX() >= x && point.getBlockZ() >= z
+                    && point.getBlockX() <= dx && point.getBlockZ() <= dz) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+    String GetFlagInZone(Location point) {
+        try {
+            for (String flagId : plugin.flagsDB.GetFlagsId()) {
+                int offset = plugin.getConfig().getInt("protection-distance");
+                Location flagLoc = plugin.flagsDB.GetFlagLoc(flagId);
+                int x = flagLoc.getBlockX() - offset;
+                int z = flagLoc.getBlockZ() - offset;
+                int dx = flagLoc.getBlockX() + offset;
+                int dz = flagLoc.getBlockZ() + offset;
+
+                if(point.getBlockX() >= x && point.getBlockZ() >= z
+                        && point.getBlockX() <= dx && point.getBlockZ() <= dz ) {
+                    return flagId;
+                }
+            }
+        } catch (Exception exception) {
+            exception.printStackTrace();
+        }
+
+        return null;
+    }
+
     @EventHandler
-    public void PrepareCraftingEvent(PrepareItemCraftEvent e) {
+    public void PrepareCraftingEvent(PrepareItemCraftEvent e) throws Exception {
         if(e.getRecipe() instanceof Keyed) {
             if(((Keyed)flagRecipe).getKey().equals(((Keyed)e.getRecipe()).getKey())) {
 //                Проверка на наличие предметов
@@ -127,49 +181,142 @@ public class Flag implements Listener {
                     }
                 }
 
-                if(hasPillar && hasCloth) {
-                    ItemStack newFlag = flag;
-                    ItemMeta newFlagMeta = newFlag.getItemMeta();
-                    newFlagMeta.getPersistentDataContainer().set(new NamespacedKey(plugin, "cloth-blocks"), PersistentDataType.STRING, clothBlocks);
-                    newFlagMeta.getPersistentDataContainer().set(new NamespacedKey(plugin, "pillar-blocks"), PersistentDataType.STRING, pillarBlocks);
-                    newFlagMeta.getPersistentDataContainer().set(new NamespacedKey(plugin, "isFlag"), PersistentDataType.STRING, "true");
-                    newFlag.setItemMeta(newFlagMeta);
+                if(!plugin.flagsDB.onFlagExists(clothBlocks)) {
+                    if (hasPillar && hasCloth) {
+                        ItemStack newFlag = flag;
+                        ItemMeta newFlagMeta = newFlag.getItemMeta();
+                        newFlagMeta.getPersistentDataContainer().set(new NamespacedKey(plugin, "cloth-blocks"), PersistentDataType.STRING, clothBlocks);
+                        newFlagMeta.getPersistentDataContainer().set(new NamespacedKey(plugin, "pillar-blocks"), PersistentDataType.STRING, pillarBlocks);
+                        newFlagMeta.getPersistentDataContainer().set(new NamespacedKey(plugin, "isFlag"), PersistentDataType.STRING, "true");
+                        newFlag.setItemMeta(newFlagMeta);
 
-                    e.getInventory().setResult(newFlag);
-                    return;
+                        e.getInventory().setResult(newFlag);
+                    } else {
+                        e.getInventory().setResult(null);
+                    }
                 } else {
+                    e.getView().getPlayer().sendMessage(String.valueOf(plugin.GetLangFileLine("ru", "exceptions.flag-exists")));
                     e.getInventory().setResult(null);
-                    return;
                 }
+
+                return;
             }
         }
     }
 
     @EventHandler
-    public void SetFlagEvent(PlayerInteractEvent e) {
+    public void SetFlagEvent(PlayerInteractEvent e) throws Exception{
         if(e.getAction().equals(Action.RIGHT_CLICK_BLOCK)) {
             if(e.getHand() == EquipmentSlot.HAND && e.hasItem()) {
                 ItemStack item = e.getItem();
                 ItemMeta itemMeta = item.getItemMeta();
 
                 if(itemMeta.getPersistentDataContainer().has(new NamespacedKey(plugin, "isFlag"), PersistentDataType.STRING)) {
-                    e.setCancelled(true);
+                    if (plugin.getConfig().getStringList("available-worlds").contains(e.getPlayer().getWorld().getName())) {
+                        final Location flagLoc = e.getClickedBlock().getLocation();
+                        final int protectionDistance = plugin.getConfig().getInt("protection-distance");
 
-                    UUID flagId = UUID.randomUUID();
-                    String flagName = e.getPlayer().getName();
-                    String flagPattern = itemMeta.getPersistentDataContainer().get(new NamespacedKey(plugin, "cloth-blocks"), PersistentDataType.STRING);
+                        final String playerId = e.getPlayer().getUniqueId().toString();
+                        final UUID flagId = UUID.randomUUID();
+                        final String flagName = e.getPlayer().getName();
+                        final String flagPattern = itemMeta.getPersistentDataContainer().get(new NamespacedKey(plugin, "cloth-blocks"), PersistentDataType.STRING);
+                        if(plugin.playersDB.GetPlayerFlag(playerId) == null) {
+                            if (!plugin.flagsDB.onFlagExists(flagPattern)) {
+                                if (!isFlagZone(flagLoc) &&
+                                        !isFlagZone(flagLoc.clone().add(-protectionDistance, 0, 0)) &&
+                                        !isFlagZone(flagLoc.clone().add(protectionDistance, 0, 0)) &&
+                                        !isFlagZone(flagLoc.clone().add(0, 0, -protectionDistance)) &&
+                                        !isFlagZone(flagLoc.clone().add(0, 0, protectionDistance)) &&
+                                        !isFlagZone(flagLoc.clone().add(protectionDistance, 0, protectionDistance)) &&
+                                        !isFlagZone(flagLoc.clone().add(protectionDistance, 0, -protectionDistance)) &&
+                                        !isFlagZone(flagLoc.clone().add(-protectionDistance, 0, -protectionDistance)) &&
+                                        !isFlagZone(flagLoc.clone().add(-protectionDistance, 0, protectionDistance))) {
 
-                    try {
-                        if(!plugin.flagsDB.onFlagExists(flagPattern)) {
-                            plugin.flagsDB.WriteFlag(flagId.toString(), flagName, flagPattern);
-                            plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, SetFlag(item, e.getClickedBlock().getLocation()), 3L);
-                            item.setAmount(item.getAmount()-1);
+                                    e.setCancelled(true);
+
+                                    plugin.flagsDB.WriteFlag(flagId.toString(), flagName, flagPattern);
+                                    plugin.flagsDB.WriteFlagLoc(flagId.toString(), flagLoc.clone().add(0, 1, 0).toVector(), flagLoc.getWorld().getName());
+                                    plugin.flagsDB.WriteFlagKnobStrength(flagId.toString(), plugin.getConfig().getInt("start-flag-strength"), flagLoc.clone().add(0, 7, 0));
+                                    plugin.playersDB.SetPlayerFlag(playerId, flagId.toString(), flagPattern);
+                                    plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, SetFlag(item, e.getClickedBlock().getLocation()), 3L);
+                                    item.setAmount(item.getAmount() - 1);
+                                } else {
+                                    e.getPlayer().sendMessage(String.valueOf(plugin.GetLangFileLine("ru", "exceptions.flag-is-near")));
+                                }
+                            } else {
+                                e.getPlayer().sendMessage(String.valueOf(plugin.GetLangFileLine("ru", "exceptions.flag-exists")));
+                            }
+                        } else {
+                            e.getPlayer().sendMessage(String.valueOf(plugin.GetLangFileLine("ru", "exceptions.player-has-flag")));
                         }
-                    } catch (Exception exception) {
-                        exception.printStackTrace();
                     }
+                    e.setCancelled(true);
+                }
+            }
+        }
+    }
 
+    @EventHandler
+    public void FlagKnobProtectionEvent(BlockBreakEvent e) throws Exception {
+        Block brokenBlock = e.getBlock();
+        Location blockLoc = brokenBlock.getLocation();
 
+        String flagId = plugin.flagsDB.GetFlagIdWithKnobLoc(blockLoc);
+
+        if(flagId != null) {
+            e.setCancelled(true);
+
+            Player player = e.getPlayer();
+
+            if(!flagId.equals(plugin.playersDB.GetPlayerFlag(player.getUniqueId().toString()))) {
+                int flagStrength = plugin.flagsDB.GetCurrentFlagKnobStrength(flagId);
+
+                plugin.flagsDB.ChangeFlagKnobStrength(flagId, flagStrength-1);
+                flagStrength--;
+
+                if(flagStrength <= 0) {
+                    plugin.playersDB.RemovePlayerFlag(flagId);
+                    plugin.playersDB.RemoveFlag(flagId);
+                    plugin.flagsDB.RemoveFlag(flagId);
+                    blockLoc.getWorld().getBlockAt(blockLoc).setType(Material.NETHERRACK);
+                    blockLoc.getWorld().getBlockAt(blockLoc).getRelative(BlockFace.UP).setType(Material.FIRE);
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void FlagBreakBlockProtectionEvent(BlockBreakEvent e) throws Exception {
+        final Block brokenBlock = e.getBlock();
+        final Location blockLoc = brokenBlock.getLocation();
+
+        if (isFlagZone(blockLoc)) {
+            if (!GetFlagInZone(blockLoc).equals(plugin.playersDB.GetPlayerFlag(e.getPlayer().getUniqueId().toString()))) {
+                if (!plugin.playersDB.IsPlacedByPlayerBlock(e.getPlayer().getUniqueId().toString(), brokenBlock.getType().name(), blockLoc)) {
+                    e.setCancelled(true);
+                    return;
+                }
+            }
+        }
+
+        plugin.playersDB.RemoveBlock(brokenBlock.getType().name(), blockLoc);
+    }
+
+    @EventHandler
+    public void FlagPlaceBlockProtectionEvent(BlockPlaceEvent e) throws Exception {
+        final Block placedBlock = e.getBlockPlaced();
+        final Location blockLoc = placedBlock.getLocation();
+
+        if(isFlagZone(blockLoc)) {
+            if(!GetFlagInZone(blockLoc).equals(plugin.playersDB.GetPlayerFlag(e.getPlayer().getUniqueId().toString()))) {
+                if(!plugin.getConfig().getStringList("available-blocks").contains(placedBlock.getType().name())) {
+                    e.setCancelled(true);
+                    return;
+                } else {
+                    String playerId = e.getPlayer().getUniqueId().toString();
+                    String blockId = placedBlock.getType().name();
+
+                    plugin.playersDB.SetPlayerBlock(playerId, blockId, blockLoc);
                 }
             }
         }
